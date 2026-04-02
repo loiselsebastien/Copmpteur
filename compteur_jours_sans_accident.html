@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compteur Jours Sans Accident</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@300;400;600&display=swap');
+
+  :root {
+    --bg: #0a0e14;
+    --accent: #00e5a0;
+    --danger: #ff3b3b;
+    --warn: #ffaa00;
+    --text: #ffffff;
+    --muted: rgba(255,255,255,0.35);
+    --card: rgba(255,255,255,0.04);
+    --border: rgba(255,255,255,0.08);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Barlow', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  /* ── Background grid ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,160,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,160,0.04) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+  }
+
+  /* ── DISPLAY MODE (Navori full-screen) ── */
+  #display {
+    text-align: center;
+    position: relative;
+    z-index: 1;
+    animation: fadeIn .8s ease both;
+  }
+
+  .label-top {
+    font-family: 'Barlow', sans-serif;
+    font-weight: 600;
+    font-size: clamp(0.9rem, 2.5vw, 1.4rem);
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 1rem;
+  }
+
+  .counter-wrap {
+    position: relative;
+    display: inline-block;
+  }
+
+  .counter-glow {
+    position: absolute;
+    inset: -40px;
+    background: radial-gradient(ellipse at center, rgba(0,229,160,0.18) 0%, transparent 70%);
+    pointer-events: none;
+    animation: pulse 3s ease-in-out infinite;
+  }
+
+  .counter {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(8rem, 28vw, 20rem);
+    line-height: 0.85;
+    color: var(--accent);
+    letter-spacing: -0.02em;
+    text-shadow:
+      0 0 60px rgba(0,229,160,0.4),
+      0 0 120px rgba(0,229,160,0.15);
+    transition: color 0.4s, text-shadow 0.4s;
+  }
+
+  .counter.warn  { color: var(--warn);   text-shadow: 0 0 60px rgba(255,170,0,0.4); }
+  .counter.alert { color: var(--danger); text-shadow: 0 0 60px rgba(255,59,59,0.4); }
+
+  .label-bottom {
+    font-family: 'Barlow', sans-serif;
+    font-weight: 300;
+    font-size: clamp(1.2rem, 3.5vw, 2.4rem);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-top: 1.2rem;
+    color: rgba(255,255,255,0.75);
+  }
+
+  .accent-line {
+    width: clamp(60px, 12vw, 140px);
+    height: 3px;
+    background: var(--accent);
+    margin: 1.5rem auto 0;
+    box-shadow: 0 0 12px rgba(0,229,160,0.5);
+    transition: background 0.4s;
+  }
+  .accent-line.warn  { background: var(--warn); }
+  .accent-line.alert { background: var(--danger); }
+
+  .date-info {
+    margin-top: 2rem;
+    font-size: clamp(0.7rem, 1.5vw, 0.9rem);
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+
+  /* ── Admin toggle button ── */
+  #admin-btn {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'Barlow', sans-serif;
+    font-size: 0.75rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    z-index: 100;
+  }
+  #admin-btn:hover { color: var(--text); border-color: var(--accent); }
+
+  /* ── ADMIN PANEL ── */
+  #admin-panel {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(10,14,20,0.92);
+    backdrop-filter: blur(12px);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.25s ease;
+  }
+  #admin-panel.open { display: flex; }
+
+  .panel-card {
+    background: #111820;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2.5rem;
+    width: min(480px, 92vw);
+    box-shadow: 0 40px 80px rgba(0,0,0,0.6);
+  }
+
+  .panel-card h2 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.8rem;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin-bottom: 0.25rem;
+  }
+  .panel-card p.sub {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-bottom: 2rem;
+    letter-spacing: 0.05em;
+  }
+
+  .field { margin-bottom: 1.4rem; }
+  .field label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+  }
+  .field input {
+    width: 100%;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'Barlow', sans-serif;
+    font-size: 1rem;
+    padding: 0.65rem 0.9rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .field input:focus { border-color: var(--accent); }
+
+  .field-hint {
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-top: 0.4rem;
+  }
+
+  /* Threshold row */
+  .threshold-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 2rem;
+  }
+  .btn {
+    flex: 1;
+    padding: 0.7rem 1rem;
+    border-radius: 8px;
+    border: none;
+    font-family: 'Barlow', sans-serif;
+    font-weight: 600;
+    font-size: 0.85rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #0a0e14;
+  }
+  .btn-primary:hover { filter: brightness(1.1); }
+  .btn-secondary {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .btn-secondary:hover { color: var(--text); border-color: var(--muted); }
+
+  .accident-list {
+    margin-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    padding-top: 1.2rem;
+  }
+  .accident-list h3 {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.8rem;
+  }
+  .accident-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.85rem;
+  }
+  .accident-item .del {
+    color: var(--danger);
+    cursor: pointer;
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+  }
+  .accident-item .del:hover { opacity: 1; }
+
+  .toast {
+    position: fixed;
+    bottom: 70px;
+    right: 24px;
+    background: var(--accent);
+    color: #0a0e14;
+    font-family: 'Barlow', sans-serif;
+    font-weight: 600;
+    font-size: 0.8rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 10px 18px;
+    border-radius: 8px;
+    z-index: 999;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.3s;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+
+  @keyframes fadeIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes pulse { 0%,100% { opacity:0.6; } 50% { opacity:1; } }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════ DISPLAY ══════════════════ -->
+<div id="display">
+  <div class="label-top">Sécurité au travail</div>
+  <div class="counter-wrap">
+    <div class="counter-glow"></div>
+    <div class="counter" id="counter">0</div>
+  </div>
+  <div class="accent-line" id="accent-line"></div>
+  <div class="label-bottom">Jours sans accident</div>
+  <div class="date-info" id="date-info"></div>
+</div>
+
+<!-- ══════════════════ ADMIN BTN ══════════════════ -->
+<button id="admin-btn" onclick="openAdmin()">⚙ Admin</button>
+
+<!-- ══════════════════ ADMIN PANEL ══════════════════ -->
+<div id="admin-panel">
+  <div class="panel-card">
+    <h2>Administration</h2>
+    <p class="sub">Gérez la date du dernier accident et les seuils d'alerte couleur.</p>
+
+    <div class="field">
+      <label>Date du dernier accident</label>
+      <input type="date" id="input-date">
+      <div class="field-hint">Le compteur repart à 0 à cette date et s'incrémente automatiquement chaque jour.</div>
+    </div>
+
+    <div class="field">
+      <label>Note / description (optionnel)</label>
+      <input type="text" id="input-note" placeholder="Ex : Chute en zone B">
+    </div>
+
+    <div class="threshold-row">
+      <div class="field">
+        <label>⚠ Seuil orange (jours)</label>
+        <input type="number" id="thresh-warn" min="0" placeholder="Ex : 30">
+        <div class="field-hint">En dessous → orange</div>
+      </div>
+      <div class="field">
+        <label>🎯 Objectif (jours)</label>
+        <input type="number" id="thresh-ok" min="0" placeholder="Ex : 90">
+        <div class="field-hint">Au-dessus → vert</div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-secondary" onclick="closeAdmin()">Annuler</button>
+      <button class="btn btn-primary" onclick="saveSettings()">✓ Enregistrer</button>
+    </div>
+
+    <div class="accident-list">
+      <h3>Historique des accidents</h3>
+      <div id="history-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ TOAST ══════════════════ -->
+<div class="toast" id="toast"></div>
+
+<script>
+  // ── Storage keys ──
+  const KEY_ACCIDENTS  = 'ql_accidents';    // [{date, note}]
+  const KEY_THRESH_W   = 'ql_thresh_warn';  // nb jours → orange
+  const KEY_THRESH_OK  = 'ql_thresh_ok';    // nb jours → vert
+
+  // ── Load state ──
+  function getAccidents() {
+    try { return JSON.parse(localStorage.getItem(KEY_ACCIDENTS)) || []; }
+    catch { return []; }
+  }
+  function saveAccidents(arr) {
+    localStorage.setItem(KEY_ACCIDENTS, JSON.stringify(arr));
+  }
+
+  function getThresholds() {
+    return {
+      warn: parseInt(localStorage.getItem(KEY_THRESH_W)) || 30,
+      ok:   parseInt(localStorage.getItem(KEY_THRESH_OK)) || 90
+    };
+  }
+
+  // ── Compute days since last accident ──
+  function daysSince(dateStr) {
+    const ref  = new Date(dateStr);
+    const now  = new Date();
+    ref.setHours(0,0,0,0); now.setHours(0,0,0,0);
+    return Math.floor((now - ref) / 86400000);
+  }
+
+  // ── Update display ──
+  function updateDisplay() {
+    const accidents = getAccidents();
+    const thresholds = getThresholds();
+    const counter   = document.getElementById('counter');
+    const line      = document.getElementById('accent-line');
+    const dateInfo  = document.getElementById('date-info');
+
+    if (accidents.length === 0) {
+      counter.textContent = '—';
+      dateInfo.textContent = 'Aucun accident enregistré';
+      return;
+    }
+
+    // Most recent accident
+    const last = accidents.slice().sort((a,b) => new Date(b.date)-new Date(a.date))[0];
+    const days = daysSince(last.date);
+
+    // Animated count-up
+    animateCount(counter, days);
+
+    // Color state
+    counter.className = 'counter';
+    line.className = 'accent-line';
+    if (days < thresholds.warn) {
+      counter.classList.add('alert');
+      line.classList.add('alert');
+    } else if (days < thresholds.ok) {
+      counter.classList.add('warn');
+      line.classList.add('warn');
+    }
+
+    // Date info
+    const dateLabel = new Date(last.date).toLocaleDateString('fr-FR', { day:'2-digit', month:'long', year:'numeric' });
+    dateInfo.textContent = `Depuis le ${dateLabel}${last.note ? ' · ' + last.note : ''}`;
+  }
+
+  function animateCount(el, target) {
+    const duration = 800;
+    const start = Date.now();
+    const from = parseInt(el.textContent) || 0;
+    function step() {
+      const p = Math.min((Date.now()-start)/duration, 1);
+      const ease = 1 - Math.pow(1-p, 3);
+      el.textContent = Math.round(from + (target - from) * ease);
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  // ── Admin panel ──
+  function openAdmin() {
+    const accidents = getAccidents().slice().sort((a,b)=>new Date(b.date)-new Date(a.date));
+    const t = getThresholds();
+
+    // Pre-fill date with most recent accident
+    document.getElementById('input-date').value = accidents.length ? accidents[0].date : '';
+    document.getElementById('input-note').value = accidents.length ? accidents[0].note : '';
+    document.getElementById('thresh-warn').value = t.warn;
+    document.getElementById('thresh-ok').value   = t.ok;
+
+    renderHistory(accidents);
+    document.getElementById('admin-panel').classList.add('open');
+  }
+
+  function closeAdmin() {
+    document.getElementById('admin-panel').classList.remove('open');
+  }
+
+  function renderHistory(accidents) {
+    const list = document.getElementById('history-list');
+    if (!accidents.length) { list.innerHTML = '<div style="color:var(--muted);font-size:.8rem">Aucun accident enregistré</div>'; return; }
+    list.innerHTML = accidents.map((a, i) => `
+      <div class="accident-item">
+        <span>${new Date(a.date).toLocaleDateString('fr-FR')}${a.note ? ' — '+a.note : ''}</span>
+        <span class="del" onclick="deleteAccident(${i})">Supprimer</span>
+      </div>
+    `).join('');
+  }
+
+  function deleteAccident(idx) {
+    const accidents = getAccidents().slice().sort((a,b)=>new Date(b.date)-new Date(a.date));
+    accidents.splice(idx, 1);
+    saveAccidents(accidents);
+    renderHistory(accidents.slice().sort((a,b)=>new Date(b.date)-new Date(a.date)));
+    updateDisplay();
+    showToast('Accident supprimé');
+  }
+
+  function saveSettings() {
+    const dateVal = document.getElementById('input-date').value;
+    const note    = document.getElementById('input-note').value.trim();
+    const warn    = parseInt(document.getElementById('thresh-warn').value) || 30;
+    const ok      = parseInt(document.getElementById('thresh-ok').value) || 90;
+
+    if (dateVal) {
+      const accidents = getAccidents();
+      // Check if same date already exists → update note
+      const existing = accidents.find(a => a.date === dateVal);
+      if (existing) {
+        existing.note = note;
+      } else {
+        accidents.push({ date: dateVal, note });
+      }
+      saveAccidents(accidents);
+    }
+
+    localStorage.setItem(KEY_THRESH_W,  warn);
+    localStorage.setItem(KEY_THRESH_OK, ok);
+
+    closeAdmin();
+    updateDisplay();
+    showToast('Paramètres enregistrés ✓');
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  // ── Close admin on overlay click ──
+  document.getElementById('admin-panel').addEventListener('click', function(e) {
+    if (e.target === this) closeAdmin();
+  });
+
+  // ── Auto-refresh at midnight ──
+  function scheduleRefresh() {
+    const now  = new Date();
+    const next = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1, 0, 0, 5);
+    setTimeout(() => { updateDisplay(); scheduleRefresh(); }, next-now);
+  }
+
+  // ── Init ──
+  updateDisplay();
+  scheduleRefresh();
+
+  // ── Auto-open admin if ?admin in URL ──
+  if (window.location.search.includes('admin')) {
+    openAdmin();
+  }
+</script>
+</body>
+</html>
